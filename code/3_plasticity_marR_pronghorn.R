@@ -4,13 +4,11 @@
 #################################################################
 ########################## set up ###############################
 #################################################################
-setwd("/Users/Mushy 1/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/BaBA_Season2")
-#setwd("G:/My Drive/RESEARCH/Pronghorn/BaBA_Season2")
-
 library(tidyverse)
 library(data.table)
 library(MCMCglmm)
 library(coda)
+library(bayestestR)
 
 pronghorn <- read_csv("./result/prong_df_monthly.csv") %>% 
   mutate(mo = as.numeric(mo), yr = as.numeric(yr)) %>% 
@@ -32,6 +30,7 @@ pronghorn.l <- pronghorn %>%
     cos_mo = cos(2*pi*mo/12)) %>%  #Stolwijk, A. M., H. M. P. M. Straatman, and G. A. Zielhuis. "Studying seasonality by using sine and cosine functions in regression analysis." Journal of Epidemiology & Community Health 53.4 (1999): 235-238.Stolwijk, A. M., H. M. P. M. Straatman, and G. A. Zielhuis. "Studying seasonality by using sine and cosine functions in regression analysis." Journal of Epidemiology & Community Health 53.4 (1999): 235-238.
   left_join(pronghorn.mig.status, by = "id_yr_mo")
 ggpairs(pronghorn.l, columns= c(3:9, 11:12)) 
+
 # # #################################################################
 # # ############################ models #############################
 # # #################################################################
@@ -85,7 +84,7 @@ ggpairs(pronghorn.l, columns= c(3:9, 11:12))
 # # #plot(mcmc_PC1_2)
 # saveRDS(mcmc_PC1_2, "result/models/mcmc_prong_pc1_randreg.RDS")
 # 
-# # 
+# #
 # mcmc_PC2_2 <- MCMCglmm(PC2 ~ fence_density + sin_mo + cos_mo + mig_status,
 #                        random =~ us(1 + fence_density):id,
 #                        rcov = ~units,
@@ -105,16 +104,26 @@ ggpairs(pronghorn.l, columns= c(3:9, 11:12))
 #################################################################
 ### now compare the random intercept models and the random regression models 
 #################################################################
-# mcmc_PC1_1 <- readRDS("result/models/mcmc_prong_pc1_randint.RDS")
-# mcmc_PC2_1 <- readRDS("result/models/mcmc_prong_pc2_randint.RDS")
-# mcmc_PC1_2 <- readRDS("result/models/mcmc_prong_pc1_randreg.RDS")
-# mcmc_PC2_2 <- readRDS("result/models/mcmc_prong_pc2_randreg.RDS")
+mcmc_PC1_1 <- readRDS("result/models/mcmc_prong_pc1_randint.RDS")
+mcmc_PC2_1 <- readRDS("result/models/mcmc_prong_pc2_randint.RDS")
+mcmc_PC1_2 <- readRDS("result/models/mcmc_prong_pc1_randreg.RDS")
+mcmc_PC2_2 <- readRDS("result/models/mcmc_prong_pc2_randreg.RDS")
 
 DIC = data.frame(PC = rep(c("PC1","PC2"), each = 2), 
-                 mod = rep(c("random intercept", "random regression"), 2),
-                 DIC = c(mcmc_PC1_1$DIC, mcmc_PC1_2$DIC, mcmc_PC2_1$DIC, mcmc_PC2_2$DIC))
-# write_csv(DIC, "result/midproduct/DIC_riVSrr_pronghorn.csv")
+                mod = rep(c("random intercept", "random regression"), 2),
+                DIC = c(mcmc_PC1_1$DIC, mcmc_PC1_2$DIC, mcmc_PC2_1$DIC, mcmc_PC2_2$DIC))
+
+#write_csv(DIC, "result/midproduct/DIC_riVSrr_pronghorn.csv")
 # based on DIC random regression models are better. 
+
+# for  table 1 and s table
+ci(mcmc_PC1_2)
+p_direction(mcmc_PC1_2)
+rope(mcmc_PC1_2)
+
+ci(mcmc_PC2_2)
+p_direction(mcmc_PC2_2)
+rope(mcmc_PC2_2)
 
 #############################################################
 ##################### Continuous CondR ######################
@@ -143,10 +152,10 @@ condR <- function(betaX, meanX, Vx, Vr, Vu, Vv, Cuv, xrange) {
   # Minimum value of the between-group variance (at xmin)
   minVix <- Vu - Cuv^2/Vv
   # create a dataframe of conditional repeatabilities and covariate
-  l1     <- floor(meanX/((xrange[2] - xrange[1])/201))
-  x.1 	 <- rep(seq(xrange[1], meanX, length.out = l1), each = 2000)
+  l1     <- floor(meanX/((xrange[2] - xrange[1])/401))
+  x.1 	 <- rep(seq(xrange[1], meanX, length.out = l1), each = 500)
   x.1    <- x.1[!x.1 == meanX]
-  x.2    <- rep(seq(meanX, xrange[2], length.out = 201-l1), each = 2000)
+  x.2    <- rep(seq(meanX, xrange[2], length.out = 401-l1), each = 500)
   condR  <- data.frame(x = c(x.1, x.2)) 
   condR  <- condR %>% mutate(condR.x = Vu + x^2 * Vv + 2* x * Cuv,
                              Vp.x = condR.x + Vr,
@@ -211,7 +220,7 @@ condR.PC2 <- condR(betaX, meanX, Vx, Vr, Vu, Vv, Cuv, xrange)
 
 ########### marginalized R (averaging across fence density) ######################
 mar.r <- data.frame(PC = c("PC1", "PC2"),
-                    Rmar = c(mean(condR.PC1$Rmar), mean(condR.PC2$Rmar)),
-                    Rmar.lower = c(HPDinterval(condR.PC1$Rmar)[1], HPDinterval(condR.PC2$Rmar)[1]),
-                    Rmar.upper = c(HPDinterval(condR.PC1$Rmar)[2], HPDinterval(condR.PC2$Rmar)[2]))
+                            Rmar = c(mean(condR.PC1$Rmar), mean(condR.PC2$Rmar)),
+                            Rmar.lower = c(HPDinterval(condR.PC1$Rmar)[1], HPDinterval(condR.PC2$Rmar)[1]),
+                            Rmar.upper = c(HPDinterval(condR.PC1$Rmar)[2], HPDinterval(condR.PC2$Rmar)[2]))
 #write_csv(mar.r, "result/midproduct/marR_pronghorn.csv")

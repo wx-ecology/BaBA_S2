@@ -4,13 +4,11 @@
 #################################################################
 ########################## set up ###############################
 #################################################################
-setwd("/Users/Mushy 1/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/BaBA_Season2")
-#setwd("G:/My Drive/RESEARCH/Pronghorn/BaBA_Season2")
-
 library(tidyverse)
 library(data.table)
 library(MCMCglmm)
 library(coda)
+library(bayestestR)
 
 deer <- read_csv("./result/deer_df_monthly.csv") %>% 
   mutate(mo = as.numeric(mo), yr = as.numeric(yr)) %>% 
@@ -28,9 +26,9 @@ deer.mig.status <- read_csv('./result/midproduct/manualmigstatus_deer.csv') %>%
 deer.l <- deer %>% 
   mutate(
     fence_density = fence_density*1000, #to bring to similar magnitute and also means km/km2, easier for interpretation
-    cos_mo = cos(mo), # using cos and sin to consider the circular nature of month
-    sin_mo = sin(mo)
-    )
+    sin_mo = sin(2*pi*mo/12), 
+    cos_mo = cos(2*pi*mo/12)) %>%  #Stolwijk, A. M., H. M. P. M. Straatman, and G. A. Zielhuis. "Studying seasonality by using sine and cosine functions in regression analysis." Journal of Epidemiology & Community Health 53.4 (1999): 235-238.Stolwijk, A. M., H. M. P. M. Straatman, and G. A. Zielhuis. "Studying seasonality by using sine and cosine functions in regression analysis." Journal of Epidemiology & Community Health 53.4 (1999): 235-238.
+  left_join(deer.mig.status, by = "id_yr_mo")
 #ggpairs(deer.l, columns= 3:9) 
 
 #################################################################
@@ -105,16 +103,25 @@ deer.l <- deer %>%
 ### now compare the random intercept models and the random regression models 
 #################################################################
 # pc 1 
-# mcmc_PC1_1 <- readRDS("result/models/mcmc_deer_pc1_randint.RDS")
-# mcmc_PC2_1 <- readRDS("result/models/mcmc_deer_pc2_randint.RDS")
-# mcmc_PC1_2 <- readRDS("result/models/mcmc_deer_pc1_randreg.RDS")
-# mcmc_PC2_2 <- readRDS("result/models/mcmc_deer_pc2_randreg.RDS")
+mcmc_PC1_1 <- readRDS("result/models/mcmc_deer_pc1_randint.RDS")
+mcmc_PC2_1 <- readRDS("result/models/mcmc_deer_pc2_randint.RDS")
+mcmc_PC1_2 <- readRDS("result/models/mcmc_deer_pc1_randreg.RDS")
+mcmc_PC2_2 <- readRDS("result/models/mcmc_deer_pc2_randreg.RDS")
 
 DIC = data.frame(PC = rep(c("PC1","PC2"), each = 2), 
-                 mod = rep(c("random intercept", "random regression"), 2),
-                 DIC = c(mcmc_PC1_1$DIC, mcmc_PC1_2$DIC, mcmc_PC2_1$DIC, mcmc_PC2_2$DIC))
+                mod = rep(c("random intercept", "random regression"), 2),
+                DIC = c(mcmc_PC1_1$DIC, mcmc_PC1_2$DIC, mcmc_PC2_1$DIC, mcmc_PC2_2$DIC))
 # write_csv(DIC, "result/midproduct/DIC_riVSrr_deer.csv")
 # based on DIC random regression models are better. 
+
+# for  table 1 and s table
+ci(mcmc_PC1_2)
+p_direction(mcmc_PC1_2)
+rope(mcmc_PC1_2)
+
+ci(mcmc_PC2_2)
+p_direction(mcmc_PC2_2)
+rope(mcmc_PC2_2)
 
 ########################################################################
 ##################### CONDITIONAL REPEATABILITY  #######################
@@ -145,10 +152,10 @@ condR <- function(betaX, meanX, Vx, Vr, Vu, Vv, Cuv, xrange) {
   # Minimum value of the between-group variance (at xmin)
   minVix <- Vu - Cuv^2/Vv
   # create a dataframe of conditional repeatabilities and covariate
-  l1     <- floor(meanX/((xrange[2] - xrange[1])/201))
-  x.1 	 <- rep(seq(xrange[1], meanX, length.out = l1), each = 2000)
+  l1     <- floor(meanX/((xrange[2] - xrange[1])/401))
+  x.1 	 <- rep(seq(xrange[1], meanX, length.out = l1), each = 500)
   x.1    <- x.1[!x.1 == meanX]
-  x.2    <- rep(seq(meanX, xrange[2], length.out = 201-l1), each = 2000)
+  x.2    <- rep(seq(meanX, xrange[2], length.out = 401-l1), each = 500)
   condR  <- data.frame(x = c(x.1, x.2)) 
   condR  <- condR %>% mutate(condR.x = Vu + x^2 * Vv + 2* x * Cuv,
                              Vp.x = condR.x + Vr,
@@ -217,3 +224,4 @@ conditional.r <- data.frame(PC = c("PC1", "PC2"),
                             Rmar.lower = c(HPDinterval(condR.PC1$Rmar)[1], HPDinterval(condR.PC2$Rmar)[1]),
                             Rmar.upper = c(HPDinterval(condR.PC1$Rmar)[2], HPDinterval(condR.PC2$Rmar)[2]))
 #write_csv(conditional.r, "result/midproduct/marR_deer.csv")
+

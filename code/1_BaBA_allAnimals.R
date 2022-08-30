@@ -1,5 +1,4 @@
 ## run barrier behavior analysis for both pronghorn and mule deer 
-setwd("G:/My Drive/RESEARCH/Pronghorn/BaBA_Season2/")
 target.crs <- "+init=epsg:32612"
 
 library(tidyverse)
@@ -88,6 +87,8 @@ BaBA.d <- BaBA(animal = deer.sp, barrier = fence.sp, d = d_max, interval =2, max
 library(PLNmodels)
 library(factoextra)
 ## first organize dataframe ######
+## d is determined by using quick cross as the indicator behavior. counts of quick cross peaks at the optimal buffer distance
+
 deer.baba <- read_csv("./result/BaBA/BaBA_deer_d90max.csv") %>% 
   dplyr::select(AnimalID, start_time, eventTYPE) %>%
   mutate(mo = month(start_time),
@@ -139,8 +140,9 @@ rotated_loadings <- varimax(rawLoadings)$loadings
 # Scores computed via rotating the scores
 rotated_scores <- scale(myPCA_BIC$scores) %*% varimax(rawLoadings)$rotmat
 # pca dataframe
-all_pca <- data.frame(spp = all.baba$spp, id_yr_mo = all.baba$id_yr_mo, PC1 = rotated_scores[,1], PC2 = rotated_scores[,2]) 
+all_pca <- data.frame(spp = all.baba$spp, id_yr_mo = all.baba$id_yr_mo, PC1 = -rotated_scores[,1], PC2 = -rotated_scores[,2]) # -1 so that the interpretation of the axes will be easier Mar 2022
 # write_csv(all_pca, "./result/BaBA/BaBA_all_pca.csv")
 # saveRDS(rotated_loadings,"./result/BaBA/BaBA_all_loadings.RDS" )
 
-factoextra::fviz_pca_biplot(myPCA_BIC, label = "none", habillage = all.baba$spp)
+#factoextra::fviz_pca_biplot(myPCA_BIC, label = "none", habillage = all.baba$spp)
+  

@@ -4,9 +4,6 @@
 ########### set up  ############
 ################################
 
-#setwd("G:/My Drive/RESEARCH/Pronghorn/BaBA_Season2/")
-setwd("/Users/Mushy 1/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/BaBA_Season2/")
-
 library(tidyverse)
 library(amt)
 library(hrbrthemes)

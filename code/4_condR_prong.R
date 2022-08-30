@@ -1,25 +1,49 @@
 ## to calculate conditional R at a certain fence density value, re-center fence density at these values and run models
 
 ### calculating conditional R at lo, me, hi, exhi fence density
-setwd("/Users/Mushy 1/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/BaBA_Season2")
 library(tidyverse)
 library(data.table)
 library(MCMCglmm)
 library(coda)
+library(bayestestR)
 
-pronghorn <- read_csv("./result/prong_df_monthly.csv") %>% 
-  mutate(mo = as.numeric(mo), yr = as.numeric(yr)) %>% 
-  dplyr::select(id_yr_mo, id, fence_density, mo, yr, PC1, PC2)
+pronghorn <- read_csv("./result/prong_df_monthly.csv") %>% mutate(mo = as.numeric(mo), yr = as.numeric(yr)) %>% filter(fence_density != 0) %>% 
+  dplyr::select(id_yr_mo, id, fence_density, mo, yr, PC1, PC2, total_step_lengths, HR_size)
 
-#data transformation 
-pronghorn.l <- pronghorn %>% 
+pronghorn.mig.status <- read_csv('./result/midproduct/manualmigstatus_prong.csv') %>% 
+  pivot_longer(cols = 2:13, names_to = "month", values_to = "mig_status") %>%
+  filter(!is.na(mig_status)) %>%
+  mutate(id_yr_mo = paste0(id_yr, "-",month),
+         mig_status = factor(mig_status)) 
+
+pronghorn.l <- pronghorn %>%
   mutate(
     fence_density = fence_density*1000, #to bring to similar magnitute and also means km/km2, easier for interpreting
-    mo = mo - 1, # so that when calculating intercept, x = 0 makes sense. Otherwise m0 can never be 0 in reality. 
-    cos_mo = cos(mo),
-    sin_mo = sin(mo)
-  )
+    sin_mo = sin(2*pi*mo/12), 
+    cos_mo = cos(2*pi*mo/12),  #Stolwijk, A. M., H. M. P. M. Straatman, and G. A. Zielhuis. "Studying seasonality by using sine and cosine functions in regression analysis." Journal of Epidemiology & Community Health 53.4 (1999): 235-238.Stolwijk, A. M., H. M. P. M. Straatman, and G. A. Zielhuis. "Studying seasonality by using sine and cosine functions in regression analysis." Journal of Epidemiology & Community Health 53.4 (1999): 235-238.
+    HR_size = ifelse (HR_size <1, 1, HR_size), #one outlier due to BBMM cell size
+    HR_size = log(HR_size),
+    total_step_lengths = log(total_step_lengths)
+  ) %>% 
+  left_join(pronghorn.mig.status, by = "id_yr_mo")
+
 #ggpairs(pronghorn.l, columns= 3:9) 
+
+# calculate landscape level lo, me, hi, exhi fence density 
+
+# deer <- read_csv("./result/deer_df_monthly.csv") %>%
+#   mutate(mo = as.numeric(mo), yr = as.numeric(yr)) %>% 
+#   dplyr::select(id_yr_mo, id, fence_density, mo, yr, PC1, PC2)
+# 
+# animal.l <- rbind(pronghorn, deer) %>%
+#   mutate(
+#     fence_density = fence_density*1000 #to bring to similar magnitute and also means km/km2, easier for interpreting
+#   )
+# 
+# lo = round(quantile(animal.l$fence_density, .25),2) #0.39
+# me = round(quantile(animal.l$fence_density, .5), 2) #0.68
+# hi = round(quantile(animal.l$fence_density, .75), 2) #1.00
+# exhi = round(quantile(animal.l$fence_density, .90), 2) #1.49
 
 lo = 0.39
 me = 0.68
@@ -349,22 +373,140 @@ pronghorn.condR <- tibble(Trait = c(rep("PC1", 4), rep("PC2",4)),
                                           HPDinterval(PC2_r_lc)[1], HPDinterval(PC2_r_mc)[1], HPDinterval(PC2_r_hc)[1], HPDinterval(PC2_r_ehc)[1]),
                           condR.upper = c(HPDinterval(PC1_r_lc)[2], HPDinterval(PC1_r_mc)[2], HPDinterval(PC1_r_hc)[2], HPDinterval(PC1_r_ehc)[2],
                                           HPDinterval(PC2_r_lc)[2], HPDinterval(PC2_r_mc)[2], HPDinterval(PC2_r_hc)[2], HPDinterval(PC2_r_ehc)[2])
-)
+                          )
 
 pronghorn.allbehavior.condR <- tibble(Trait = c(rep("PC1", 4), rep("PC2",4), rep("total distance",4), rep("range size",4)),
-                                      mod = c(rep(c("lc", "mc", "hc", "ehc"),4)),
-                                      condR.estimate = c(mean(PC1_r_lc), mean(PC1_r_mc), mean(PC1_r_hc), mean(PC1_r_ehc),
-                                                         mean(PC2_r_lc), mean(PC2_r_mc), mean(PC2_r_hc), mean(PC2_r_ehc),
-                                                         mean(length_r_lc), mean(length_r_mc), mean(length_r_hc), mean(length_r_ehc),
-                                                         mean(range_r_lc), mean(range_r_mc), mean(range_r_hc), mean(range_r_ehc)),
-                                      condR.lower = c(HPDinterval(PC1_r_lc)[1], HPDinterval(PC1_r_mc)[1], HPDinterval(PC1_r_hc)[1], HPDinterval(PC1_r_ehc)[1],
-                                                      HPDinterval(PC2_r_lc)[1], HPDinterval(PC2_r_mc)[1], HPDinterval(PC2_r_hc)[1], HPDinterval(PC2_r_ehc)[1],
-                                                      HPDinterval(length_r_lc)[1], HPDinterval(length_r_mc)[1], HPDinterval(length_r_hc)[1], HPDinterval(length_r_ehc)[1],
-                                                      HPDinterval(range_r_lc)[1], HPDinterval(range_r_mc)[1], HPDinterval(range_r_hc)[1], HPDinterval(range_r_ehc)[1]),
-                                      condR.upper = c(HPDinterval(PC1_r_lc)[2], HPDinterval(PC1_r_mc)[2], HPDinterval(PC1_r_hc)[2], HPDinterval(PC1_r_ehc)[2],
-                                                      HPDinterval(PC2_r_lc)[2], HPDinterval(PC2_r_mc)[2], HPDinterval(PC2_r_hc)[2], HPDinterval(PC2_r_ehc)[2],
-                                                      HPDinterval(length_r_lc)[2], HPDinterval(length_r_mc)[2], HPDinterval(length_r_hc)[2], HPDinterval(length_r_ehc)[2],
-                                                      HPDinterval(range_r_lc)[2], HPDinterval(range_r_mc)[2], HPDinterval(range_r_hc)[2], HPDinterval(range_r_ehc)[2]))
+                          mod = c(rep(c("lc", "mc", "hc", "ehc"),4)),
+                          condR.estimate = c(mean(PC1_r_lc), mean(PC1_r_mc), mean(PC1_r_hc), mean(PC1_r_ehc),
+                                             mean(PC2_r_lc), mean(PC2_r_mc), mean(PC2_r_hc), mean(PC2_r_ehc),
+                                             mean(length_r_lc), mean(length_r_mc), mean(length_r_hc), mean(length_r_ehc),
+                                             mean(range_r_lc), mean(range_r_mc), mean(range_r_hc), mean(range_r_ehc)),
+                          condR.lower = c(HPDinterval(PC1_r_lc)[1], HPDinterval(PC1_r_mc)[1], HPDinterval(PC1_r_hc)[1], HPDinterval(PC1_r_ehc)[1],
+                                          HPDinterval(PC2_r_lc)[1], HPDinterval(PC2_r_mc)[1], HPDinterval(PC2_r_hc)[1], HPDinterval(PC2_r_ehc)[1],
+                                          HPDinterval(length_r_lc)[1], HPDinterval(length_r_mc)[1], HPDinterval(length_r_hc)[1], HPDinterval(length_r_ehc)[1],
+                                          HPDinterval(range_r_lc)[1], HPDinterval(range_r_mc)[1], HPDinterval(range_r_hc)[1], HPDinterval(range_r_ehc)[1]),
+                          condR.upper = c(HPDinterval(PC1_r_lc)[2], HPDinterval(PC1_r_mc)[2], HPDinterval(PC1_r_hc)[2], HPDinterval(PC1_r_ehc)[2],
+                                          HPDinterval(PC2_r_lc)[2], HPDinterval(PC2_r_mc)[2], HPDinterval(PC2_r_hc)[2], HPDinterval(PC2_r_ehc)[2],
+                                          HPDinterval(length_r_lc)[2], HPDinterval(length_r_mc)[2], HPDinterval(length_r_hc)[2], HPDinterval(length_r_ehc)[2],
+                                          HPDinterval(range_r_lc)[2], HPDinterval(range_r_mc)[2], HPDinterval(range_r_hc)[2], HPDinterval(range_r_ehc)[2]))
 
 write_csv(pronghorn.condR, "./result/midproduct/condR_4scenarios_prong.csv")
 write_csv(pronghorn.allbehavior.condR, "./result/midproduct/condR_allbehavior_4scenarios_prong.csv")
+
+###########################################
+#for appendix s5 table of residual variance
+prong.variance <- tibble (Trait = c(rep("PC1", 4), rep("PC2", 4)),
+                          mod = c(rep(c("lc", "mc", "hc", "ehc"),2)),
+                          Vi.estimate = c(mean( mcmc_PC1_lc$VCV[,"(Intercept):(Intercept).id"] ), 
+                                          mean( mcmc_PC1_mc$VCV[,"(Intercept):(Intercept).id"] ), 
+                                          mean( mcmc_PC1_hc$VCV[,"(Intercept):(Intercept).id"] ), 
+                                          mean( mcmc_PC1_ehc$VCV[,"(Intercept):(Intercept).id"] ),
+                                          
+                                          mean( mcmc_PC2_lc$VCV[,"(Intercept):(Intercept).id"] ), 
+                                          mean( mcmc_PC2_mc$VCV[,"(Intercept):(Intercept).id"] ), 
+                                          mean( mcmc_PC2_hc$VCV[,"(Intercept):(Intercept).id"] ), 
+                                          mean( mcmc_PC2_ehc$VCV[,"(Intercept):(Intercept).id"] )),
+                          
+                          Vi.lower = c(HPDinterval(mcmc_PC1_lc$VCV[,"(Intercept):(Intercept).id"])[1], HPDinterval(mcmc_PC1_mc$VCV[,"(Intercept):(Intercept).id"])[1], 
+                                       HPDinterval(mcmc_PC1_hc$VCV[,"(Intercept):(Intercept).id"])[1], HPDinterval(mcmc_PC1_ehc$VCV[,"(Intercept):(Intercept).id"])[1],
+                                       
+                                       HPDinterval(mcmc_PC2_lc$VCV[,"(Intercept):(Intercept).id"])[1], HPDinterval(mcmc_PC2_mc$VCV[,"(Intercept):(Intercept).id"])[1], 
+                                       HPDinterval(mcmc_PC2_hc$VCV[,"(Intercept):(Intercept).id"])[1], HPDinterval(mcmc_PC2_ehc$VCV[,"(Intercept):(Intercept).id"])[1]),
+                          
+                          Vi.upper = c(HPDinterval(mcmc_PC1_lc$VCV[,"(Intercept):(Intercept).id"])[2], HPDinterval(mcmc_PC1_mc$VCV[,"(Intercept):(Intercept).id"])[2], 
+                                       HPDinterval(mcmc_PC1_hc$VCV[,"(Intercept):(Intercept).id"])[2], HPDinterval(mcmc_PC1_ehc$VCV[,"(Intercept):(Intercept).id"])[2],
+                                       
+                                       HPDinterval(mcmc_PC2_lc$VCV[,"(Intercept):(Intercept).id"])[2], HPDinterval(mcmc_PC2_mc$VCV[,"(Intercept):(Intercept).id"])[2], 
+                                       HPDinterval(mcmc_PC2_hc$VCV[,"(Intercept):(Intercept).id"])[2], HPDinterval(mcmc_PC2_ehc$VCV[,"(Intercept):(Intercept).id"])[2]),
+                          
+                          Vr.estimate = c(mean( mcmc_PC1_lc$VCV[,"units"] ), 
+                                          mean( mcmc_PC1_mc$VCV[,"units"] ), 
+                                          mean( mcmc_PC1_hc$VCV[,"units"] ), 
+                                          mean( mcmc_PC1_ehc$VCV[,"units"] ),
+                                          
+                                          mean( mcmc_PC2_lc$VCV[,"units"] ), 
+                                          mean( mcmc_PC2_mc$VCV[,"units"] ), 
+                                          mean( mcmc_PC2_hc$VCV[,"units"] ), 
+                                          mean( mcmc_PC2_ehc$VCV[,"units"] )),
+                          
+                          Vr.lower = c(HPDinterval(mcmc_PC1_lc$VCV[,"units"])[1], HPDinterval(mcmc_PC1_mc$VCV[,"units"])[1], 
+                                       HPDinterval(mcmc_PC1_hc$VCV[,"units"])[1], HPDinterval(mcmc_PC1_ehc$VCV[,"units"])[1],
+                                       
+                                       HPDinterval(mcmc_PC2_lc$VCV[,"units"])[1], HPDinterval(mcmc_PC2_mc$VCV[,"units"])[1], 
+                                       HPDinterval(mcmc_PC2_hc$VCV[,"units"])[1], HPDinterval(mcmc_PC2_ehc$VCV[,"units"])[1]),
+                          
+                          Vr.upper = c(HPDinterval(mcmc_PC1_lc$VCV[,"units"])[2], HPDinterval(mcmc_PC1_mc$VCV[,"units"])[2], 
+                                       HPDinterval(mcmc_PC1_hc$VCV[,"units"])[2], HPDinterval(mcmc_PC1_ehc$VCV[,"units"])[2],
+                                       
+                                       HPDinterval(mcmc_PC2_lc$VCV[,"units"])[2], HPDinterval(mcmc_PC2_mc$VCV[,"units"])[2], 
+                                       HPDinterval(mcmc_PC2_hc$VCV[,"units"])[2], HPDinterval(mcmc_PC2_ehc$VCV[,"units"])[2]) )
+write_csv(prong.variance, "./result/midproduct/Vr_Vi_4scenarios_prong.csv")
+
+
+###########################################
+## for table intercept-slope covariance ###
+###########################################
+#pc1
+PC1_cor_RR_lc <- mcmc_PC1_lc$VCV[, "(Intercept):fence_dens_lc.id"]/
+  (sqrt(mcmc_PC1_lc$VCV[,"(Intercept):(Intercept).id"]) * 
+     sqrt(mcmc_PC1_lc$VCV[,"fence_dens_lc:fence_dens_lc.id"]))
+
+PC1_cor_RR_mc <- mcmc_PC1_mc$VCV[, "(Intercept):fence_dens_mc.id"]/
+  (sqrt(mcmc_PC1_mc$VCV[,"(Intercept):(Intercept).id"]) * 
+     sqrt(mcmc_PC1_mc$VCV[,"fence_dens_mc:fence_dens_mc.id"]))
+
+PC1_cor_RR_hc <- mcmc_PC1_hc$VCV[, "(Intercept):fence_dens_hc.id"]/
+  (sqrt(mcmc_PC1_hc$VCV[,"(Intercept):(Intercept).id"]) * 
+     sqrt(mcmc_PC1_hc$VCV[,"fence_dens_hc:fence_dens_hc.id"]))
+
+PC1_cor_RR_ehc <- mcmc_PC1_ehc$VCV[, "(Intercept):fence_dens_ehc.id"]/
+  (sqrt(mcmc_PC1_ehc$VCV[,"(Intercept):(Intercept).id"]) * 
+     sqrt(mcmc_PC1_ehc$VCV[,"fence_dens_ehc:fence_dens_ehc.id"]))
+
+# pc2
+PC2_cor_RR_lc <- mcmc_PC2_lc$VCV[, "(Intercept):fence_dens_lc.id"]/
+  (sqrt(mcmc_PC2_lc$VCV[,"(Intercept):(Intercept).id"]) * 
+     sqrt(mcmc_PC2_lc$VCV[,"fence_dens_lc:fence_dens_lc.id"]))
+
+PC2_cor_RR_mc <- mcmc_PC2_mc$VCV[, "(Intercept):fence_dens_mc.id"]/
+  (sqrt(mcmc_PC2_mc$VCV[,"(Intercept):(Intercept).id"]) * 
+     sqrt(mcmc_PC2_mc$VCV[,"fence_dens_mc:fence_dens_mc.id"]))
+
+PC2_cor_RR_hc <- mcmc_PC2_hc$VCV[, "(Intercept):fence_dens_hc.id"]/
+  (sqrt(mcmc_PC2_hc$VCV[,"(Intercept):(Intercept).id"]) * 
+     sqrt(mcmc_PC2_hc$VCV[,"fence_dens_hc:fence_dens_hc.id"]))
+
+PC2_cor_RR_ehc <- mcmc_PC2_ehc$VCV[, "(Intercept):fence_dens_ehc.id"]/
+  (sqrt(mcmc_PC2_ehc$VCV[,"(Intercept):(Intercept).id"]) * 
+     sqrt(mcmc_PC2_ehc$VCV[,"fence_dens_ehc:fence_dens_ehc.id"]))
+
+prong.slo.int <- tibble (Trait = c(rep("PC1", 4), rep("PC2", 4)),
+                          mod = c(rep(c("lc", "mc", "hc", "ehc"),2)),
+                          RR.estimate = c(mean( PC1_cor_RR_lc  ), 
+                                          mean( PC1_cor_RR_mc ), 
+                                          mean( PC1_cor_RR_hc ), 
+                                          mean( PC1_cor_RR_ehc ),
+                                          
+                                          mean( PC2_cor_RR_lc ), 
+                                          mean( PC2_cor_RR_mc ), 
+                                          mean( PC2_cor_RR_hc), 
+                                          mean( PC2_cor_RR_ehc)),
+                          
+                          RR.lower = c(HPDinterval(PC1_cor_RR_lc)[1], HPDinterval(PC1_cor_RR_mc)[1], 
+                                       HPDinterval(PC1_cor_RR_hc)[1], HPDinterval(PC1_cor_RR_ehc)[1],
+                                       
+                                       HPDinterval(PC2_cor_RR_lc)[1], HPDinterval(PC2_cor_RR_mc)[1], 
+                                       HPDinterval(PC2_cor_RR_hc)[1], HPDinterval(PC2_cor_RR_ehc)[1]),
+                          
+                          RR.upper = c(HPDinterval(PC1_cor_RR_lc)[2], HPDinterval(PC1_cor_RR_mc)[2], 
+                                       HPDinterval(PC1_cor_RR_hc)[2], HPDinterval(PC1_cor_RR_ehc)[2],
+                                       
+                                       HPDinterval(PC2_cor_RR_lc)[2], HPDinterval(PC2_cor_RR_mc)[2], 
+                                       HPDinterval(PC2_cor_RR_hc)[2], HPDinterval(PC2_cor_RR_ehc)[2]),
+                         pd = c(p_direction(PC1_cor_RR_lc)$pd[1], p_direction(PC1_cor_RR_mc)$pd[1],
+                                p_direction(PC1_cor_RR_hc)$pd[1], p_direction(PC1_cor_RR_ehc)$pd[1],
+                                
+                                p_direction(PC2_cor_RR_lc)$pd[1], p_direction(PC2_cor_RR_mc)$pd[1],
+                                p_direction(PC2_cor_RR_hc)$pd[1], p_direction(PC2_cor_RR_ehc)$pd[1]))
+write_csv(prong.slo.int, "./result/midproduct/Cor_Slo_Int_4scenarios_prong.csv")
+  
