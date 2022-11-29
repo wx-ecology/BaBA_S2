@@ -1,3 +1,3 @@
 # BaBA_S2
-partial duplicates from BaBA_Cnsqn.
-individual vairations and plasticity in barrier behaviors - models and codes
+code for manuscript "Fencing amplifies individual differences in movement with implications on survival for two migratory ungulates"
+
