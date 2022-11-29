@@ -5,7 +5,6 @@ library(GGally)
 library(hrbrthemes)
 library(ggdist)
 library(gridExtra)
-setwd("/Users/Mushy 1/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/BaBA_Season2")
 # conditional R plot across fence density 
 condR.PC1.prong <- read_csv("./result/midproduct/condR_continuous_prong_PC1.csv")
 condR.PC2.prong <- read_csv("./result/midproduct/condR_continuous_prong_PC2.csv")
