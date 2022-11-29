@@ -1,6 +1,5 @@
 library(dplyr)
 library(ggplot2)
-setwd("/Volumes/GoogleDrive/My Drive/RESEARCH/Pronghorn/BaBA_Season2/")
 
 ## Pronghorn covariates ####
 # prong<-read.csv("./result/pronghorn_cov.csv")
