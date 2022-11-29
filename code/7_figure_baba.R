@@ -9,8 +9,6 @@ library(gridExtra)
 library(gganimate)
 # library(ggraph)
 
-setwd("/Users/Mushy 1/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/BaBA_Season2")
-
 # extract legend from one ggplot
 g_legend <- function(a.gplot){
   tmp = ggplot_gtable(ggplot_build(a.gplot))
