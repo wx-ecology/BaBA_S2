@@ -1,5 +1,4 @@
 library(tidyverse);library(patchwork);library(ggbeeswarm);library(hrbrthemes)
-setwd("/Volumes/GoogleDrive/My Drive/RESEARCH/Pronghorn/BaBA_Season2/")
 
 # brn figure using Raph's method 
 pronghorn.baba <- read_csv("./result/prong_df_monthly.csv") %>% 
